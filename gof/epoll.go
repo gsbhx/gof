@@ -75,34 +75,45 @@ func (e *EpollObj) getGlobalFd() *EpollObj {
 		os.Exit(1)
 	}
 	e.epId = epfd
-	e.EpollCtl(e.socket, syscall.EPOLL_CTL_ADD)
+	e.EpollAdd(e.socket)
 	return e
 }
 
-//EpollCtl方法，添加、删除监听的fd
+//EpollADD方法，添加、删除监听的fd
 //fd 需要监听的fd对象
-//status syscall.EPOLL_CTL_ADD添加  syscall.EPOLL_CTL_DEL删除
-func (e *EpollObj) EpollCtl(fd, status int) {
+//status syscall.EPOLL_CTL_ADD添加
+func (e *EpollObj) EpollAdd(fd int) {
 	//通过EpollCtl将epfd加入到Epoll中，去监听
-	if err := syscall.EpollCtl(e.epId, status, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
+	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_ADD, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
+		fmt.Println("epoll_ctl err:", err)
+		os.Exit(1)
+	}
+}
+
+// syscall.EPOLL_CTL_DEL删除
+func (e *EpollObj) EpollDel(fd int) {
+	//通过EpollCtl将epfd加入到Epoll中，去监听
+	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
 		fmt.Println("epoll_ctl err:", err)
 		os.Exit(1)
 	}
 }
 
 func (e *EpollObj) EpollWait(handle func(fd int, connType ConnStatus)) error {
-	events := make([]syscall.EpollEvent, 3)
+	events := make([]syscall.EpollEvent, 10)
 	n, err := syscall.EpollWait(e.epId, events, -1)
 	if err != nil {
 		fmt.Println("epoll_wait err:", e)
 		return err
 	}
+	fmt.Println("received new events,",events,n)
 	for i := 0; i < n; i++ {
 		//如果是系统描述符，就建立一个新的连接
 		connType := CONN_MESSAGE //默认是读内容
 		if int(events[i].Fd) == e.socket {
 			connType = CONN_NEW
 		}
+		fmt.Println("received new events,",events,connType)
 		handle(int(events[i].Fd), connType)
 	}
 	return nil

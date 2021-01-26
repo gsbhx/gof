@@ -102,17 +102,9 @@ func (c *Conn) Read() {
 		if msgtype==CloseMessage{
 			c.Server.closeFd(c.fd)
 			return
-		}else if msgtype==PingMessage{
-			c.Write()
 		}
+		msg.MsgType=msgtype
 
-		switch msgtype {
-		case CloseMessage:
-			c.Server.closeFd(c.fd)
-		case TextMessage,BinaryMessage:
-			msg.MsgType=msgtype
-
-		}
 		fmt.Printf("msgtype===%b\n",msgtype)
 		//查询掩码
 		mask := buf[1] >> 7

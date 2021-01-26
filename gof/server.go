@@ -56,6 +56,7 @@ func (s *Server) handler(fd int, connType ConnStatus) {
 		s.handShaker(newFd)
 		//s.messageChan<-newFd
 	case CONN_MESSAGE:
+		Log.Info("接收到描述符为%v的消息",fd)
 		c, _ := s.conns.Load(fd)
 		s.readMessageChan <- c.(*Conn)
 	case CONN_CLOSE:
@@ -74,8 +75,8 @@ func (s *Server) handShaker(fd int) {
 	if err != nil {
 		fmt.Println("upgrade err:", err.Error())
 	}
-	heade:=<-newConn.WriteBuf
-	_, _ = syscall.Write(fd, heade)
+	heade := <-newConn.WriteBuf
+	_, _ = syscall.Write(fd, heade.Content)
 	s.handle.OnConnect(newConn)
 	s.conns.Store(fd, newConn)
 }
@@ -119,7 +120,8 @@ func (s *Server) readMessage() {
 	go func() {
 		for c := range s.readMessageChan {
 			c.Read()
-			s.handle.OnMessage(c, <-c.ReadBuf)
+			content := <-c.ReadBuf
+			s.handle.OnMessage(c, content.Content)
 		}
 	}()
 }
@@ -131,7 +133,7 @@ func (s *Server) checkTimeOut() {
 			s.conns.Range(func(k, v interface{}) bool {
 				c := v.(*Conn)
 				if time.Now().Sub(c.UpdateTime) >= time.Second*100 {
-					fmt.Printf("fd 为 %d 的连接即将被断开\n", c.fd)
+					Log.Info("fd 为 %d 的连接即将被断开\n", c.fd)
 					s.handler(c.fd, CONN_CLOSE)
 				}
 				return true
@@ -141,13 +143,11 @@ func (s *Server) checkTimeOut() {
 }
 
 func (s *Server) CloseFds() {
-	go func() {
-		for {
-			s.conns.Range(func(k, v interface{}) bool {
-				c := v.(*Conn)
-				s.handler(c.fd, CONN_CLOSE)
-				return true
-			})
-		}
-	}()
+	for {
+		s.conns.Range(func(k, v interface{}) bool {
+			c := v.(*Conn)
+			s.handler(c.fd, CONN_CLOSE)
+			return true
+		})
+	}
 }

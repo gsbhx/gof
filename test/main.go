@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 )
 
 
@@ -36,7 +35,8 @@ func main() {
 		s := <-c
 		switch s {
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
-			time.Sleep(time.Second)
+			serve.Close()
+			//time.Sleep(time.Second)
 			return
 		case syscall.SIGHUP:
 		default:

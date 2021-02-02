@@ -13,8 +13,6 @@ type HandshakeError struct {
 func (e HandshakeError) Error() string { return e.message }
 
 type Upgrader struct {
-	ReadBufferSize, WriteBufferSize int
-
 	// Error specifies the function for generating HTTP error responses. If Error
 	// is nil, then http.Error is used to generate the HTTP response.
 	Error func(status int, reason error)
@@ -75,7 +73,7 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, e
 	if challengeKey == "" {
 		return u.returnError(http.StatusBadRequest, "websocket: not a websocket handshake: 'Sec-WebSocket-Key' header is missing or blank")
 	}
-	c := newConn(fd, u.ReadBufferSize, u.WriteBufferSize,s)
+	c := newConn(fd,s)
 	// Use larger of hijacked buffer and connection write buffer for header.
 	wf:=[]byte{}
 	wf = append(wf, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "...)
@@ -83,7 +81,7 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, e
 	wf = append(wf, "\r\n"...)
 
 	wf = append(wf, "\r\n"...)
-	c.WriteBuf<-Message{
+	c.handShake <-Message{
 		MessageType: -1,
 		Content:     wf,
 	}

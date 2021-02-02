@@ -274,7 +274,6 @@ func FormatHeader(buf string,length int)(map[string]string){
 			}
 			if str != ""{
 				arr:=strings.Split(str,": ")
-				fmt.Println(arr)
 				header[arr[0]]=arr[1]
 				str=""
 			}

@@ -12,7 +12,6 @@ import (
 
 const (
 	EpollListener = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET
-	EpollRead     = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET
 )
 
 type EpollObj struct {
@@ -32,11 +31,33 @@ func InitEpoll(ip string, port int) *EpollObj {
 
 //创建socket对象
 func (e *EpollObj) getScoket() *EpollObj {
+	/*第一个参数 domain
+	syscall.AF_INET，表示服务器之间的网络通信
+	syscall.AF_UNIX表示同一台机器上的进程通信
+	syscall.AF_INET6表示以IPv6的方式进行服务器之间的网络通信
+	*/
+	/*第二个参数 typ
+	syscall.SOCK_RAW，表示使用原始套接字，可以构建传输层的协议头部，启用IP_HDRINCL的话，IP层的协议头部也可以构造，就是上面区分的传输层socket和网络层socket。
+	syscall.SOCK_STREAM, 基于TCP的socket通信，应用层socket。
+	syscall.SOCK_DGRAM, 基于UDP的socket通信，应用层socket。
+	*/
+	/* 第三个参数 proto
+	IPPROTO_TCP 接收TCP协议的数据
+	IPPROTO_IP 接收任何的IP数据包
+	IPPROTO_UDP 接收UDP协议的数据
+	IPPROTO_ICMP 接收ICMP协议的数据
+	IPPROTO_RAW 只能用来发送IP数据包，不能接收数据。
+	*/
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
 	if err != nil {
-		fmt.Println("getScoket err:", err)
+		Log.Error("getScoket err:%v", err.Error())
 		os.Exit(1)
 	}
+	if err := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
+		Log.Error("set ReuseAddr failed,err:%v", err.Error())
+		os.Exit(1)
+	}
+
 	e.socket = fd
 	return e
 }
@@ -44,7 +65,7 @@ func (e *EpollObj) getScoket() *EpollObj {
 //监听端口
 func (e *EpollObj) listen() *EpollObj {
 	if err := syscall.SetNonblock(e.socket, true); err != nil {
-		fmt.Println("setnonblock err", err)
+		Log.Error("setnonblock err:%v", err.Error())
 		os.Exit(1)
 	}
 	//监听
@@ -106,87 +127,14 @@ func (e *EpollObj) EpollWait(handle func(fd int, connType ConnStatus)) error {
 		fmt.Println("epoll_wait err:", e)
 		return err
 	}
-	fmt.Println("received new events,",events,n)
 	for i := 0; i < n; i++ {
 		//如果是系统描述符，就建立一个新的连接
 		connType := CONN_MESSAGE //默认是读内容
 		if int(events[i].Fd) == e.socket {
 			connType = CONN_NEW
 		}
-		fmt.Println("received new events,",events,connType)
+		Log.Info("received new events,%v,%v", events, connType)
 		handle(int(events[i].Fd), connType)
 	}
 	return nil
 }
-
-// func (e *EpollObj) Run() {
-// 	/*第一个参数 domain
-// 		// syscall.AF_INET，表示服务器之间的网络通信
-// 		// syscall.AF_UNIX表示同一台机器上的进程通信
-// 		// syscall.AF_INET6表示以IPv6的方式进行服务器之间的网络通信
-// 	*/
-// 	/*第二个参数 typ
-// 	// syscall.SOCK_RAW，表示使用原始套接字，可以构建传输层的协议头部，启用IP_HDRINCL的话，IP层的协议头部也可以构造，就是上面区分的传输层socket和网络层socket。
-// 	// syscall.SOCK_STREAM, 基于TCP的socket通信，应用层socket。
-// 	// syscall.SOCK_DGRAM, 基于UDP的socket通信，应用层socket。
-// 	*/
-// 	/* 第三个参数 proto
-// 	// IPPROTO_TCP 接收TCP协议的数据
-// 	// IPPROTO_IP 接收任何的IP数据包
-// 	// IPPROTO_UDP 接收UDP协议的数据
-// 	// IPPROTO_ICMP 接收ICMP协议的数据
-// 	// IPPROTO_RAW 只能用来发送IP数据包，不能接收数据。
-// 	*/
-// 	//创建系统描述符
-// 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, syscall.IPPROTO_TCP)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		os.Exit(1)
-// 	}
-// 	defer syscall.Close(fd)
-// 	//将系统描述符设置为非阻塞
-// 	if err = syscall.SetNonblock(fd, true); err != nil {
-// 		fmt.Println("setnonblock err", err)
-// 		os.Exit(1)
-// 	}
-// 	//监听
-// 	addr := syscall.SockaddrInet4{Port: 8000}
-// 	copy(addr.Addr[:], net.ParseIP("0.0.0.0").To4())
-
-// 	syscall.Bind(fd, &addr)
-// 	syscall.Listen(fd, 10)
-// 	//创建epfd
-// 	epfd, e := syscall.EpollCreate1(0)
-// 	if e != nil {
-// 		fmt.Println("epoll_create1 err", err)
-// 		os.Exit(1)
-// 	}
-// 	defer syscall.Close(epfd)
-// 	s.event.Events = syscall.EPOLLIN
-// 	s.event.Fd = int32(fd)
-// 	//通过EpollCtl将epfd加入到Epoll中，去监听
-// 	if e = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &s.event); e != nil {
-// 		fmt.Println("epoll_ctl err:", e)
-// 		os.Exit(1)
-// 	}
-// 	for {
-// 		nevents, e := syscall.EpollWait(epfd, s.events[:], -1)
-// 		fmt.Printf("%+v,%+v,%+v\n", nevents, epfd, fd)
-// 		if e != nil {
-// 			fmt.Println("epoll_wait err:", e)
-// 			break
-// 		}
-// 		for ev := 0; ev < nevents; ev++ {
-// 			//如果是系统描述符，就建立一个新的连接
-// 			if int(s.events[ev].Fd) == fd {
-// 				_, err := s.addConn((fd))
-// 				if err != nil {
-// 					fmt.Println("new conn err:", err.Error())
-// 				}
-// 			} else {
-// 				//如果不是系统描述符，就通过Handler方法去处理fd的内容
-// 				go s.handler(int(s.events[ev].Fd))
-// 			}
-// 		}
-// 	}
-// }

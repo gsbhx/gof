@@ -48,7 +48,7 @@ func (u *Upgrader) returnError(status int, reason string) (*Conn, error) {
 	return nil, err
 }
 
-func (u *Upgrader) Upgrade(fd int, header map[string]string) (*Conn, error) {
+func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, error) {
 	const badHandshake = "websocket: the client is not using the websocket protocol: "
 
 	if header["Connection"]!="Upgrade" {
@@ -75,7 +75,7 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string) (*Conn, error) {
 	if challengeKey == "" {
 		return u.returnError(http.StatusBadRequest, "websocket: not a websocket handshake: 'Sec-WebSocket-Key' header is missing or blank")
 	}
-	c := newConn(fd, u.ReadBufferSize, u.WriteBufferSize)
+	c := newConn(fd, u.ReadBufferSize, u.WriteBufferSize,s)
 	// Use larger of hijacked buffer and connection write buffer for header.
 	wf:=[]byte{}
 	wf = append(wf, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "...)
@@ -84,8 +84,8 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string) (*Conn, error) {
 
 	wf = append(wf, "\r\n"...)
 	c.WriteBuf<-Message{
-		MsgType: -1,
-		Content: wf,
+		MessageType: -1,
+		Content:     wf,
 	}
 	return c, nil
 }

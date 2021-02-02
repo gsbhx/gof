@@ -20,8 +20,8 @@ func (Ws) OnMessage(c *gof.Conn, bytes []byte) {
 	fmt.Println("read:", string(bytes))
 	c.Write(bytes)
 }
-func (Ws) OnClose(c *gof.Conn) {
-	fmt.Println("close:", c.GetFd())
+func (Ws) OnClose(c *gof.Conn,code uint16, reason []byte) {
+	fmt.Println("close:", c.GetFd(),"closeCode:",code," closeReason:",string(reason))
 }
 
 

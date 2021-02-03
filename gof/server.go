@@ -76,7 +76,11 @@ func (s *Server) handShaker(fd int) {
 		Log.Error("upgrade err: %+v", err.Error())
 	}
 	heade := <-newConn.handShake
-	_, _ = syscall.Write(fd, heade.Content)
+	_, err = syscall.Write(fd, heade.Content)
+	if err != nil{
+		Log.Error("send handshaker message err: %+v", err.Error())
+		return
+	}
 	s.handle.OnConnect(newConn)
 	Log.Info("要加入到链接库中的fd:%v", fd)
 	s.conns.Store(fd, newConn)
@@ -162,6 +166,7 @@ func (s *Server) checkTimeOut() {
 				}
 				return true
 			})
+			time.Sleep(time.Second*2)
 		}
 	}()
 }

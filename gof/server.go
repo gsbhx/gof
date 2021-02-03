@@ -74,11 +74,12 @@ func (s *Server) handShaker(fd int) {
 	newConn, err := upgrader.Upgrade(fd, headerMap, s)
 	if err != nil {
 		Log.Error("upgrade err: %+v", err.Error())
+		return
 	}
 	heade := <-newConn.handShake
 	_, err = syscall.Write(fd, heade.Content)
 	if err != nil{
-		Log.Error("send handshaker message err: %+v", err.Error())
+		Log.Error("send handshaker message err: %+v,fd:%d,%+v", err.Error(),fd,newConn)
 		return
 	}
 	s.handle.OnConnect(newConn)

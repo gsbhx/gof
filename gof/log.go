@@ -28,8 +28,8 @@ type loggerObject struct {
 }
 
 const (
-	DATEFORMATE = "2006-01-02"
-	DEBUG int = iota
+	DATEFORMATE     = "2006-01-02"
+	DEBUG       int = iota
 	INFO
 	ERROR
 	FATAL
@@ -40,54 +40,50 @@ var isConsole = true
 var level = 1
 var logDir = ""
 
-func (this *Logger) InitLogger(dir string) (e error) {
-	logDir = dir
-	err := createDir(logDir)
-	if err != nil {
-		fmt.Println("mkdir dir failed")
-		e = err
-	} else {
-		this.infoLogger = new(loggerObject)
-		this.debugLogger = new(loggerObject)
-		this.errorLogger = new(loggerObject)
-		this.fatalLogger = new(loggerObject)
-
-		makeLoggerObj(this.infoLogger, "INFO")
-		makeLoggerObj(this.debugLogger, "DEBUG")
-		makeLoggerObj(this.errorLogger, "ERROR")
-		makeLoggerObj(this.fatalLogger, "FATAL")
+func (l *Logger) InitLogger(dir string) (err error) {
+	if err = createDir(dir); err != nil {
+		fmt.Println("mkdir dir failed", err.Error())
+		return
 	}
+	l.infoLogger = new(loggerObject)
+	l.debugLogger = new(loggerObject)
+	l.errorLogger = new(loggerObject)
+	l.fatalLogger = new(loggerObject)
+	makeLoggerObj(l.infoLogger, "INFO")
+	makeLoggerObj(l.debugLogger, "DEBUG")
+	makeLoggerObj(l.errorLogger, "ERROR")
+	makeLoggerObj(l.fatalLogger, "FATAL")
 	return
 }
 
-func (this *Logger) Info(format string, args ...interface{}) {
+func (l *Logger) Info(format string, args ...interface{}) {
 	if level <= INFO {
-		this.infoLogger.write("INFO", format, args...)
+		l.infoLogger.write("INFO", format, args...)
 	}
 }
 
-func (this *Logger) Debug(format string, args ...interface{}) {
+func (l *Logger) Debug(format string, args ...interface{}) {
 	if level <= DEBUG {
-		this.debugLogger.write("DEBUG", format, args...)
+		l.debugLogger.write("DEBUG", format, args...)
 	}
 }
 
-func (this *Logger) Fatal(format string, args ...interface{}) {
+func (l *Logger) Fatal(format string, args ...interface{}) {
 	if level <= FATAL {
-		this.fatalLogger.write("FATAL", format, args...)
+		l.fatalLogger.write("FATAL", format, args...)
 	}
 }
 
-func (this *Logger) Error(format string, args ...interface{}) {
+func (l *Logger) Error(format string, args ...interface{}) {
 	if level <= ERROR {
-		this.errorLogger.write("ERROR", format, args...)
+		l.errorLogger.write("ERROR", format, args...)
 	}
 }
-func (this *Logger) SetLevel(userLevel int) {
+func (l *Logger) SetLevel(userLevel int) {
 	level = userLevel
 }
 
-func (this *Logger) SetConsole(console bool) {
+func (l *Logger) SetConsole(console bool) {
 	isConsole = console
 }
 
@@ -105,18 +101,16 @@ func createDir(dir string) (e error) {
 	return
 }
 
-func (this *loggerObject) write(levelString string, format string, args ...interface{}) {
-	isNewDay := this.isNewDay()
+func (l *loggerObject) write(levelString string, format string, args ...interface{}) {
+	isNewDay := l.isNewDay()
 	if isNewDay {
-		makeLoggerObj(this, levelString)
+		makeLoggerObj(l, levelString)
 	}
 	str := fmt.Sprintf(format, args...)
-	if this.obj != nil {
-		this.obj.Println(str)
+	if l.obj != nil {
+		l.obj.Println(str)
 	}
-	if isConsole {
-		fmt.Println(str)
-	}
+
 }
 
 func makeLoggerObj(l *loggerObject, name string) {
@@ -125,7 +119,7 @@ func makeLoggerObj(l *loggerObject, name string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.file != nil {
-		l.file.Close()
+		_ = l.file.Close()
 	}
 
 	t, _ := time.Parse(DATEFORMATE, now)
@@ -140,13 +134,13 @@ func makeLoggerObj(l *loggerObject, name string) {
 	}
 }
 
-func (this *loggerObject) isNewDay() bool {
+func (l *loggerObject) isNewDay() bool {
 	now := time.Now().Format(DATEFORMATE)
 	t, _ := time.Parse(DATEFORMATE, now)
-	return t.After(*this.lastDate)
+	return t.After(*l.lastDate)
 }
 
-func init()  {
-	Log =new(Logger)
-	Log.InitLogger("Logs")
+func init() {
+	Log = new(Logger)
+	_ = Log.InitLogger("Logs")
 }

@@ -1,8 +1,6 @@
 package gof
 
 import (
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"syscall"
@@ -76,11 +74,11 @@ func (e *EpollObj) listen() *EpollObj {
 	}
 	copy(addr.Addr[:], net.ParseIP(ip).To4())
 	if err := syscall.Bind(e.socket, &addr); err != nil {
-		fmt.Println("bind err:", err.Error())
+		Log.Error("bind err:%v", err.Error())
 		os.Exit(1)
 	}
 	if err := syscall.Listen(e.socket, 10); err != nil {
-		fmt.Println("listen err:", err.Error())
+		Log.Error("listen err:%v", err.Error())
 		os.Exit(1)
 	}
 	return e
@@ -90,9 +88,9 @@ func (e *EpollObj) listen() *EpollObj {
 func (e *EpollObj) getGlobalFd() *EpollObj {
 	//创建epfd
 	epfd, err := syscall.EpollCreate1(0)
-	log.Printf("getGlobalFd 创建的epfd为：%+v,e.fd:%d\n", epfd, e.socket)
+	Log.Info("getGlobalFd 创建的epfd为：%+v,e.fd:%d", epfd, e.socket)
 	if err != nil {
-		fmt.Println("epoll_create1 err:", err)
+		Log.Error("epoll_create1 err:%+v", err)
 		os.Exit(1)
 	}
 	e.epId = epfd
@@ -106,7 +104,7 @@ func (e *EpollObj) getGlobalFd() *EpollObj {
 func (e *EpollObj) eAdd(fd int) {
 	//通过EpollCtl将epfd加入到Epoll中，去监听
 	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_ADD, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
-		fmt.Println("epoll_ctl add err:", err, fd)
+		Log.Error("epoll_ctl add err:%+v,fd:%+v", err, fd)
 		os.Exit(1)
 	}
 }
@@ -115,7 +113,7 @@ func (e *EpollObj) eAdd(fd int) {
 func (e *EpollObj) eDel(fd int) {
 	//通过EpollCtl将epfd加入到Epoll中，去监听
 	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
-		fmt.Println("epoll_ctl del err:", err, fd)
+		Log.Error("epoll_ctl del err:%+v,fd:%+v", err, fd)
 		os.Exit(1)
 	}
 }
@@ -124,7 +122,7 @@ func (e *EpollObj) eWait(handle func(fd int, connType ConnStatus)) error {
 	events := make([]syscall.EpollEvent, 1024)
 	n, err := syscall.EpollWait(e.epId, events, -1)
 	if err != nil {
-		fmt.Println("epoll_wait err:", e)
+		Log.Error("epoll_wait err:%+v", err)
 		return err
 	}
 	for i := 0; i < n; i++ {

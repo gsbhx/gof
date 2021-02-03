@@ -156,7 +156,7 @@ func (s *Server) checkTimeOut() {
 	go func() {
 		for {
 			s.conns.Range(func(k, v interface{}) bool {
-				if time.Now().Sub(v.(*Conn).updateTime) >= time.Second*100 {
+				if time.Now().Sub(v.(*Conn).updateTime) >= time.Second*10000 {
 					Log.Info("fd 为 %d 的连接即将被断开\n", v.(*Conn).fd)
 					s.closeFd(v.(*Conn))
 				}

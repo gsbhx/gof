@@ -133,7 +133,6 @@ func (e *EpollObj) eWait(handle func(fd int, connType ConnStatus)) error {
 		if int(events[i].Fd) == e.socket {
 			connType = CONN_NEW
 		}
-		Log.Info("received new events,%v,%v", events, connType)
 		handle(int(events[i].Fd), connType)
 	}
 	return nil

@@ -37,7 +37,7 @@ func InitServer(ip string, port int, handle WebSocketInterface) *Server {
 }
 
 func (s *Server) Run() {
-	s.checkTimeOut() //如果过期，就关闭conn
+	//s.checkTimeOut() //如果过期，就关闭conn
 	s.checkMessage() //如果有消息，就调用 conn.read方法解包
 	s.getMessage()   //如果有新的消息，就走消息处理的逻辑
 	s.closeConn()
@@ -77,9 +77,11 @@ func (s *Server) handShaker(fd int) {
 		return
 	}
 	heade := <-newConn.handShake
-	_, err = syscall.Write(fd, heade.Content)
-	if err != nil{
-		Log.Error("send handshaker message err: %+v,fd:%d,%+v", err.Error(),fd,newConn)
+	n, err := syscall.Write(fd, heade.Content)
+	fmt.Printf("send handshaker message n:%+v, err: %+v, fd:%d, newConn:%+v\n", n, err, fd, newConn)
+
+	if err != nil {
+		Log.Error("send handshaker message err: %+v,fd:%d,%+v", err.Error(), fd, newConn)
 		return
 	}
 	s.handle.OnConnect(newConn)
@@ -161,13 +163,13 @@ func (s *Server) checkTimeOut() {
 	go func() {
 		for {
 			s.conns.Range(func(k, v interface{}) bool {
-				if time.Now().Sub(v.(*Conn).updateTime) >= time.Second*10000 {
+				if time.Now().Sub(v.(*Conn).updateTime) >= time.Second*100 {
 					Log.Info("fd 为 %d 的连接即将被断开\n", v.(*Conn).fd)
 					s.closeFd(v.(*Conn))
 				}
 				return true
 			})
-			time.Sleep(time.Second*2)
+			time.Sleep(time.Second * 2)
 		}
 	}()
 }
@@ -191,8 +193,8 @@ func (s *Server) closeFd(c *Conn) {
 // @Date 2021/2/2 21:40
 func (s *Server) Close() {
 	s.CloseFds()
-	if err:=syscall.Close(s.ep.epId);err!=nil{
-		Log.Error("Server Close epId err:%+v",err.Error())
+	if err := syscall.Close(s.ep.epId); err != nil {
+		Log.Error("Server Close epId err:%+v", err.Error())
 	}
 
 }

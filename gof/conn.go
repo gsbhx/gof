@@ -46,6 +46,7 @@ func (c *Conn) Read() {
 	}()
 	nbytes, _ := syscall.Read(c.fd, buf[:])
 	if nbytes > 0 {
+		Log.Info("Conn Read received message header:%b",buf[:2])
 		//查询状态
 		msgtype := int((buf[0] << 4) >> 4)
 		//查询掩码

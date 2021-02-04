@@ -127,7 +127,7 @@ func (e *EpollObj) eWait(handle func(fd int, connType ConnStatus)) error {
 		return err
 	}
 	if n>0{
-		fmt.Printf("events fds :%+v",events[:5])
+		fmt.Printf("events fds :%+v\n",events[:5])
 	}
 	for i := 0; i < n; i++ {
 		//如果是系统描述符，就建立一个新的连接

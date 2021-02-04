@@ -110,6 +110,9 @@ func (l *loggerObject) write(levelString string, format string, args ...interfac
 	if l.obj != nil {
 		l.obj.Println(str)
 	}
+	if isConsole{
+		fmt.Printf("%+v\n",str)
+	}
 
 }
 

@@ -179,12 +179,12 @@ func (s *Server) checkTimeOut() {
 // @Date 2021/2/2 21:46
 // @Param [c] //Conn
 func (s *Server) closeFd(c *Conn) {
-	//从 s.conns中删除当前fd
-	s.conns.Delete(c.fd)
 	//从当前的epoll中删除fd
 	s.ep.eDel(c.fd)
 	//从系统中关闭当前fd
 	_ = syscall.Close(c.fd)
+	//从 s.conns中删除当前fd
+	s.conns.Delete(c.fd)
 	s.handle.OnClose(c, c.closeCode, c.closeReason)
 }
 

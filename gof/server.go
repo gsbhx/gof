@@ -57,8 +57,12 @@ func (s *Server) handler(fd int, connType ConnStatus) {
 		s.handShaker(newFd)
 		//s.messageChan<-newFd
 	case CONN_MESSAGE:
-		Log.Info("azazazazazazazazazazazaz接收到描述符为%v的消息", fd)
-		c, _ := s.conns.Load(fd)
+		Log.Info("接收到描述符为%v的消息", fd)
+		c, err := s.conns.Load(fd)
+		if err {
+			Log.Info("azazazazazazazazazazazaz描述符fd 为%d的s.conns错误为：%+v", fd,err)
+			return
+		}
 		s.receiveFdBytes <- c.(*Conn)
 	default:
 		panic("no connType")
@@ -85,7 +89,7 @@ func (s *Server) handShaker(fd int) {
 		return
 	}
 	s.handle.OnConnect(newConn)
-	Log.Info("azazazazazazazazazazazaz要加入到链接库中的fd:%v", fd)
+	Log.Info("要加入到链接库中的fd:%v", fd)
 	s.conns.Store(fd, newConn)
 }
 

@@ -58,9 +58,9 @@ func (s *Server) handler(fd int, connType ConnStatus) {
 		//s.messageChan<-newFd
 	case CONN_MESSAGE:
 		Log.Info("接收到描述符为%v的消息", fd)
-		c, err := s.conns.Load(fd)
-		if err {
-			Log.Info("azazazazazazazazazazazaz描述符fd 为%d的s.conns错误为：%+v", fd,err)
+		c, ok := s.conns.Load(fd)
+		if !ok {
+			Log.Info("azazazazazazazazazazazaz描述符fd 为%d的连接对象失败",fd)
 			return
 		}
 		s.receiveFdBytes <- c.(*Conn)

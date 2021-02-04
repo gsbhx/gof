@@ -188,6 +188,7 @@ func (s *Server) closeFd(c *Conn) {
 	//从系统中关闭当前fd
 	_ = syscall.Close(c.fd)
 	//从 s.conns中删除当前fd
+	Log.Info("azazazazazazazazazazazaz正在删除fd=%d的连接")
 	s.conns.Delete(c.fd)
 	s.handle.OnClose(c, c.closeCode, c.closeReason)
 }

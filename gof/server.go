@@ -37,7 +37,7 @@ func InitServer(ip string, port int, handle WebSocketInterface) *Server {
 }
 
 func (s *Server) Run() {
-	//s.checkTimeOut() //如果过期，就关闭conn
+//	s.checkTimeOut() //如果过期，就关闭conn
 	s.checkMessage() //如果有消息，就调用 conn.read方法解包
 	s.getMessage()   //如果有新的消息，就走消息处理的逻辑
 	s.closeConn()
@@ -60,7 +60,7 @@ func (s *Server) handler(fd int, connType ConnStatus) {
 		Log.Info("接收到描述符为%v的消息", fd)
 		c, err := s.conns.Load(fd)
 		if err {
-			Log.Info("azazazazazazazazazazazaz描述符fd 为%d的s.conns错误为：%+v", fd,err)
+			Log.Info("描述符fd 为%d的s.conns错误为：%+v", fd,err)
 			return
 		}
 		s.receiveFdBytes <- c.(*Conn)
@@ -188,7 +188,7 @@ func (s *Server) closeFd(c *Conn) {
 	//从系统中关闭当前fd
 	_ = syscall.Close(c.fd)
 	//从 s.conns中删除当前fd
-	Log.Info("azazazazazazazazazazazaz正在删除fd=%d的连接")
+	Log.Info("正在删除fd=%d的连接",c.fd)
 	s.conns.Delete(c.fd)
 	s.handle.OnClose(c, c.closeCode, c.closeReason)
 }

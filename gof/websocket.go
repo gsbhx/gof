@@ -49,7 +49,7 @@ func (u *Upgrader) returnError(status int, reason string) (*Conn, error) {
 func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, error) {
 	const badHandshake = "websocket: the client is not using the websocket protocol: "
 
-	if header["Connection"]!="Upgrade" {
+	if header["Connection"]!="Upgrade" && header["Connection"]!="upgrade"{
 		return u.returnError(http.StatusBadRequest, badHandshake+"'upgrade' token not found in 'Connection' header")
 	}
 

@@ -5,12 +5,11 @@ import (
 	"net"
 	"os"
 	"syscall"
-
 	"golang.org/x/sys/unix"
 )
 
 const (
-	EpollListener = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET
+	EPOLLLISTENER = syscall.EPOLLIN | syscall.EPOLLPRI | syscall.EPOLLERR | syscall.EPOLLHUP | unix.EPOLLET
 )
 
 type EpollObj struct {
@@ -104,7 +103,7 @@ func (e *EpollObj) getGlobalFd() *EpollObj {
 //status syscall.EPOLL_CTL_ADD添加
 func (e *EpollObj) eAdd(fd int) {
 	//通过EpollCtl将epfd加入到Epoll中，去监听
-	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_ADD, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
+	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_ADD, fd, &syscall.EpollEvent{Events: EPOLLLISTENER, Fd: int32(fd)}); err != nil {
 		Log.Error("epoll_ctl add err:%+v,fd:%+v", err, fd)
 		os.Exit(1)
 	}
@@ -113,7 +112,7 @@ func (e *EpollObj) eAdd(fd int) {
 // syscall.EPOLL_CTL_DEL删除
 func (e *EpollObj) eDel(fd int) {
 	//通过EpollCtl将epfd加入到Epoll中，去监听
-	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{Events: EpollListener, Fd: int32(fd)}); err != nil {
+	if err := syscall.EpollCtl(e.epId, syscall.EPOLL_CTL_DEL, fd, &syscall.EpollEvent{Events: EPOLLLISTENER, Fd: int32(fd)}); err != nil {
 		Log.Error("epoll_ctl del err:%+v,fd:%+v", err, fd)
 		os.Exit(1)
 	}

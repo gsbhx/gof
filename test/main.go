@@ -1,7 +1,7 @@
 package main
 
 import (
-	"GoPoll/gof"
+	"gof"
 	"fmt"
 	"os"
 	"os/signal"

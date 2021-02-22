@@ -17,9 +17,9 @@ type Conn struct {
 	method      string       //请求方式 websocket必须是get请求方式
 	closeCode   uint16       //关闭状态码
 	closeReason []byte       //关闭原因
-	bytePool    *sync.Pool    //[]byte 的池子
-	readBufPool *sync.Pool    // [1024]byte的池子，用于接收fd描述符上的内容
-	messagePool *sync.Pool    //Message的池子，用于接收消息并返给服务端
+	bytePool    *sync.Pool   //[]byte 的池子
+	readBufPool *sync.Pool   // [1024]byte的池子，用于接收fd描述符上的内容
+	messagePool *sync.Pool   //Message的池子，用于接收消息并返给服务端
 }
 
 func newConn(fd int, server *Server) *Conn {
@@ -78,7 +78,6 @@ func (c *Conn) Read() {
 			msg = &Message{}
 			c.messagePool.Put(msg)
 		}
-
 		return
 	}
 
@@ -127,6 +126,12 @@ func (c *Conn) getMessage(buf []byte) []byte {
 	return content
 }
 
+
+// @Author WangKan
+// @Description //向句柄中写入文本内容
+// @Date 2021/2/22 14:01
+// @Param
+// @return
 func (c *Conn) Write(message []byte) {
 	msg := c.bytePool.Get().([]byte)
 	msg = append(msg, 129)

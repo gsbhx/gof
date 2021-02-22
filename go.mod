@@ -1,4 +1,4 @@
-module GoPoll
+module gof
 
 go 1.14
 

@@ -2,10 +2,10 @@ package gof
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"net"
 	"os"
 	"syscall"
-	"golang.org/x/sys/unix"
 )
 
 const (

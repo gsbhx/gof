@@ -81,7 +81,7 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, e
 	wf = append(wf, "\r\n"...)
 
 	wf = append(wf, "\r\n"...)
-	c.handShake <-Message{
+	c.handShake <- Message{
 		MessageType: -1,
 		Content:     wf,
 	}

@@ -82,7 +82,7 @@ func (s *Server) handShaker(fd int) {
 	}
 	heade := <-newConn.handShake
 	n, err := syscall.Write(fd, heade.Content)
-	fmt.Printf("send handshaker message n:%+v, err: %+v, fd:%d, newConn:%+v\n", n, err, fd, newConn)
+	Log.Info("send handshaker message n:%+v, err: %+v, fd:%d, newConn:%+v\n", n, err, fd, newConn)
 
 	if err != nil {
 		Log.Error("send handshaker message err: %+v,fd:%d,%+v", err.Error(), fd, newConn)

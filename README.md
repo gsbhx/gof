@@ -34,6 +34,8 @@ type WebSocketInterface interface {
     func (Ws) OnClose(c *gof.Conn,code uint16, reason []byte) {
         fmt.Println("close:", c.GetFd(),"closeCode:",code," closeReason:",string(reason))
     }
-    serve := gof.InitServer("0.0.0.0", 8801,Ws{})
-    serve.Run()
+    func main(){
+        serve := gof.InitServer("0.0.0.0", 8801,Ws{})
+        serve.Run()
+    }
 ```

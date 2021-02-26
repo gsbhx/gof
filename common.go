@@ -40,3 +40,10 @@ type Message struct {
 	MessageType int
 	Content     []byte
 }
+
+
+type Conf struct {
+	ReadBufferSize    int
+	WriteBufferSize   int
+	ConnectionTimeOut int64
+}

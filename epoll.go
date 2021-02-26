@@ -5,6 +5,7 @@ import (
 	"golang.org/x/sys/unix"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 )
 
@@ -13,15 +14,18 @@ const (
 )
 
 type EpollObj struct {
-	socket int    //socket连接
-	epId   int    //epoll 创建的唯一描述符
-	ip     string //socket监听的地址
-	port   int    //socket监听的端口
+	socket    int        //socket连接
+	epId      int        //epoll 创建的唯一描述符
+	ip        string     //socket监听的地址
+	port      int        //socket监听的端口
+	eventPool *sync.Pool //接收epoll消息
 }
 
 //初始化epoll 包含创建socket,监听端口，以及创建epoll监听
 func InitEpoll(ip string, port int) *EpollObj {
-	ep := new(EpollObj)
+	ep := &EpollObj{
+		eventPool: &sync.Pool{New: func() interface{} { return make([]syscall.EpollEvent, 1024) }},
+	}
 	ep.ip = ip
 	ep.port = port
 	return ep.getScoket().listen().getGlobalFd()
@@ -119,14 +123,18 @@ func (e *EpollObj) eDel(fd int) {
 }
 
 func (e *EpollObj) eWait(handle func(fd int, connType ConnStatus)) error {
-	events :=[1024]syscall.EpollEvent{}
+	events := e.eventPool.Get().([]syscall.EpollEvent)
+	defer func() {
+		events := make([]syscall.EpollEvent, 1024)
+		e.eventPool.Put(events)
+	}()
 	n, err := syscall.EpollWait(e.epId, events[:], -1)
 	if err != nil {
 		Log.Error("epoll_wait err:%+v", err)
 		return err
 	}
-	if n>0{
-		fmt.Printf("events fds :%+v\n",events[:5])
+	if n > 0 {
+		fmt.Printf("events fds :%+v\n", events[:5])
 	}
 	for i := 0; i < n; i++ {
 		//如果是系统描述符，就建立一个新的连接

@@ -11,6 +11,12 @@ import (
 
 var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 
+
+// @Author WangKan
+// @Description //websocket key 编码
+// @Date 2021/2/24 15:14
+// @Param
+// @return
 func computeAcceptKey(challengeKey string) string {
 	h := sha1.New()
 	h.Write([]byte(challengeKey))
@@ -18,8 +24,12 @@ func computeAcceptKey(challengeKey string) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-//HandShaker
-//
+
+// @Author WangKan
+// @Description //获取客户端发送的Header头
+// @Date 2021/2/24 15:13
+// @Param
+// @return
 func GetHeaderContent(fd int)  (string,int) {
 	for{
 		var buf [1024]byte
@@ -30,6 +40,12 @@ func GetHeaderContent(fd int)  (string,int) {
 	}
 }
 
+
+// @Author WangKan
+// @Description //将Header头转换为map
+// @Date 2021/2/24 15:13
+// @Param
+// @return
 func FormatHeader(buf string,length int)(map[string]string){
 	var header =make(map[string]string)
 	str:=""

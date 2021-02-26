@@ -16,28 +16,60 @@ type WebSocketInterface interface {
 }
 
 type Server struct {
-	ep              *EpollObj
-	conns           sync.Map //当前的所有连接
-	receiveFdBytes  chan *Conn
-	handle          WebSocketInterface
-	readMessageChan chan *Message
-	closeChan       chan *Conn //需要关闭的所有Conn
+	ep                *EpollObj
+	conns             sync.Map //当前的所有连接
+	checkTimeOutTree  *AVLTree
+	receiveFdBytes    chan *Conn
+	handle            WebSocketInterface
+	readMessageChan   chan *Message
+	closeChan         chan *Conn //需要关闭的所有Conn
+	readBufferSize    int
+	writeBufferSize   int
+	connectionTimeout int64
+	bytePool          *sync.Pool //[]byte 的池子
+	readBufPool       *sync.Pool // [1024]byte的池子，用于接收fd描述符上的内容
+	messagePool       *sync.Pool //Message的池子，用于接收消息并返给服务端
 }
 
-func InitServer(ip string, port int, handle WebSocketInterface) *Server {
+func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Server {
 	ep := InitEpoll(ip, port)
-	return &Server{
-		ep:              ep,
-		receiveFdBytes:  make(chan *Conn, 1024),
-		readMessageChan: make(chan *Message, 1024),
-		handle:          handle,
-		conns:           sync.Map{},
-		closeChan:       make(chan *Conn, 1024),
+	serv := &Server{
+		ep:                ep,
+		receiveFdBytes:    make(chan *Conn, 1024),
+		readMessageChan:   make(chan *Message, 1024),
+		handle:            handle,
+		conns:             sync.Map{},
+		checkTimeOutTree:  NewAvlTree(),
+		closeChan:         make(chan *Conn, 1024),
+		readBufferSize:    1024,
+		writeBufferSize:   1024,
+		connectionTimeout: 30,
 	}
+	if conf != nil {
+		if conf.ReadBufferSize > 0 {
+			serv.readBufferSize = conf.ReadBufferSize
+		}
+		if conf.WriteBufferSize > 0 {
+			serv.writeBufferSize = conf.WriteBufferSize
+		}
+		if conf.ConnectionTimeOut > 0 {
+			serv.connectionTimeout = conf.ConnectionTimeOut
+		}
+	}
+
+	serv.readBufPool = &sync.Pool{New: func() interface{} { return make([]byte, serv.readBufferSize) }}
+	serv.messagePool = &sync.Pool{New: func() interface{} {
+		return &Message{
+			Content: make([]byte, serv.writeBufferSize),
+		}
+	}}
+	serv.bytePool = &sync.Pool{New: func() interface{} { return make([]byte, 0, serv.writeBufferSize) }}
+
+	return serv
 }
 
 func (s *Server) Run() {
-//	s.checkTimeOut() //如果过期，就关闭conn
+	s.checkTimeOut() //如果过期，就关闭conn
 	s.checkMessage() //如果有消息，就调用 conn.read方法解包
 	s.getMessage()   //如果有新的消息，就走消息处理的逻辑
 	s.closeConn()
@@ -58,9 +90,9 @@ func (s *Server) handler(fd int, connType ConnStatus) {
 		//s.messageChan<-newFd
 	case CONN_MESSAGE:
 		Log.Info("接收到描述符为%v的消息", fd)
-		c, err := s.conns.Load(fd)
-		if err {
-			Log.Info("描述符fd 为%d的s.conns错误为：%+v", fd,err)
+		c, ok := s.conns.Load(fd)
+		if !ok {
+			Log.Info("描述符fd 为 %d 的s.conns 不存在！", fd)
 			return
 		}
 		s.receiveFdBytes <- c.(*Conn)
@@ -91,6 +123,7 @@ func (s *Server) handShaker(fd int) {
 	s.handle.OnConnect(newConn)
 	Log.Info("要加入到链接库中的fd:%v", fd)
 	s.conns.Store(fd, newConn)
+	s.checkTimeOutTree.Add(newConn.updateTime, fd)
 }
 
 // @Author WangKan
@@ -166,14 +199,40 @@ func (s *Server) closeConn() {
 func (s *Server) checkTimeOut() {
 	go func() {
 		for {
-			s.conns.Range(func(k, v interface{}) bool {
-				if time.Now().Sub(v.(*Conn).updateTime) >= time.Second*100 {
-					Log.Info("fd 为 %d 的连接即将被断开\n", v.(*Conn).fd)
-					s.closeFd(v.(*Conn))
+			//s.conns.Range(func(k, v interface{}) bool {
+			//	if time.Now().Sub(v.(*Conn).updateTime) >= time.Second* s.connectionTimeout {
+			//		Log.Info("fd 为 %d 的连接即将被断开\n", v.(*Conn).fd)
+			//		s.closeFd(v.(*Conn))
+			//	}
+			//	return true
+			//})
+			//time.Sleep(time.Second * 2)
+			/**********************************更改删除超时连接的结构为平衡二叉树*************************************/
+			//给定一个值，获取小于该值的所有元素
+			timeOutint64 := time.Now().Unix() - s.connectionTimeout
+			fmt.Println("当前时间：", time.Now().Unix())
+			expiredKeys := s.checkTimeOutTree.GetLessThanKey(timeOutint64)
+			//删除conns中的已超时的fd
+			if expiredKeys != nil {
+				for _, v := range expiredKeys {
+					slice := make([]int, 0, 1024)
+					for _, vv := range s.checkTimeOutTree.Get(v) {
+						slice = append(slice, vv)
+					}
+					for i := 0; i < len(slice); i++ {
+						c, _ := s.conns.Load(slice[i])
+						s.closeFd(c.(*Conn))
+					}
+
 				}
-				return true
-			})
-			time.Sleep(time.Second * 2)
+			}
+			//删除树中已超时的fd
+			//s.checkTimeOutTree.RemoveOneNodeAndChilds(node.Key)
+
+			fmt.Println(s.checkTimeOutTree.InOrder(-1))
+
+			time.Sleep(time.Second)
+			/**********************************更改删除超时连接的结构为平衡二叉树END**********************************/
 		}
 	}()
 }
@@ -188,7 +247,8 @@ func (s *Server) closeFd(c *Conn) {
 	//从系统中关闭当前fd
 	_ = syscall.Close(c.fd)
 	//从 s.conns中删除当前fd
-	Log.Info("正在删除fd=%d的连接",c.fd)
+	Log.Info("正在删除fd=%d的连接", c.fd)
+	_ = s.checkTimeOutTree.RemoveNodeValue(c.updateTime, c.fd)
 	s.conns.Delete(c.fd)
 	s.handle.OnClose(c, c.closeCode, c.closeReason)
 }
@@ -209,8 +269,7 @@ func (s *Server) Close() {
 // @Date 2021/2/2 21:34
 func (s *Server) CloseFds() {
 	s.conns.Range(func(k, v interface{}) bool {
-		c := v.(*Conn)
-		s.closeFd(c)
+		s.closeFd(v.(*Conn))
 		return true
 	})
 }

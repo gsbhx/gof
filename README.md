@@ -8,6 +8,10 @@ gof是一个开箱即用的websocket框架，通过golang的syscall函数直接�
 
 暂支持文本类型、二进制类型的内容接收以及文本类型的内容发送。
 
+可配置连接超时时间。
+
+可配置接收和发送消息的大小。
+
 
 ### gof如何用
 
@@ -34,6 +38,17 @@ type WebSocketInterface interface {
     func (Ws) OnClose(c *gof.Conn,code uint16, reason []byte) {
         fmt.Println("close:", c.GetFd(),"closeCode:",code," closeReason:",string(reason))
     }
-    serve := gof.InitServer("0.0.0.0", 8801,Ws{})
+    
+    
+    //现有的配置项支持三个,如果不配置的话，直接传nil就可以
+    configure:=&gof.Conf{
+		ReadBufferSize:    1024, //读取消息的缓冲区大小(byte)
+		WriteBufferSize:   1024, //写入消息的缓冲区大小(byte)
+		ConnectionTimeOut: 5,    //连接超时时间（秒）
+	}
+	
+	//serve := gof.InitServer("0.0.0.0", 8801,Ws{},nil)
+	serve := gof.InitServer("0.0.0.0", 8801,Ws{},configure)
     serve.Run()
+	
 ```

@@ -41,9 +41,10 @@ type Message struct {
 	Content     []byte
 }
 
-
 type Conf struct {
 	ReadBufferSize    int
 	WriteBufferSize   int
 	ConnectionTimeOut int64
+	CompressLevel     int
+	IsCompressOn      bool
 }

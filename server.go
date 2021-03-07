@@ -1,6 +1,7 @@
 package gof
 
 import (
+	"compress/flate"
 	"fmt"
 	"os"
 	"sync"
@@ -29,6 +30,8 @@ type Server struct {
 	bytePool          *sync.Pool //[]byte 的池子
 	readBufPool       *sync.Pool // [1024]byte的池子，用于接收fd描述符上的内容
 	messagePool       *sync.Pool //Message的池子，用于接收消息并返给服务端
+	isComporessOn     bool
+	compressLevel     int
 }
 
 func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Server {
@@ -44,6 +47,8 @@ func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Ser
 		readBufferSize:    1024,
 		writeBufferSize:   1024,
 		connectionTimeout: 30,
+		isComporessOn:     false,
+		compressLevel:     0,
 	}
 	if conf != nil {
 		if conf.ReadBufferSize > 0 {
@@ -55,12 +60,19 @@ func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Ser
 		if conf.ConnectionTimeOut > 0 {
 			serv.connectionTimeout = conf.ConnectionTimeOut
 		}
+		if conf.IsCompressOn == true {
+			serv.isComporessOn = true
+			serv.compressLevel = conf.CompressLevel
+			if conf.CompressLevel==0{
+				serv.compressLevel = flate.BestCompression
+			}
+		}
 	}
 
 	serv.readBufPool = &sync.Pool{New: func() interface{} { return make([]byte, serv.readBufferSize) }}
 	serv.messagePool = &sync.Pool{New: func() interface{} {
 		return &Message{
-			Content: make([]byte, serv.writeBufferSize),
+			Content: make([]byte,0,serv.writeBufferSize),
 		}
 	}}
 	serv.bytePool = &sync.Pool{New: func() interface{} { return make([]byte, 0, serv.writeBufferSize) }}
@@ -113,6 +125,7 @@ func (s *Server) handShaker(fd int) {
 		return
 	}
 	heade := <-newConn.handShake
+	fmt.Println(string(heade.Content))
 	n, err := syscall.Write(fd, heade.Content)
 	Log.Info("send handshaker message n:%+v, err: %+v, fd:%d, newConn:%+v\n", n, err, fd, newConn)
 
@@ -210,7 +223,7 @@ func (s *Server) checkTimeOut() {
 			/**********************************更改删除超时连接的结构为平衡二叉树*************************************/
 			//给定一个值，获取小于该值的所有元素
 			timeOutint64 := time.Now().Unix() - s.connectionTimeout
-			fmt.Println("当前时间：", time.Now().Unix())
+			//fmt.Println("当前时间：", time.Now().Unix())
 			expiredKeys := s.checkTimeOutTree.GetLessThanKey(timeOutint64)
 			//删除conns中的已超时的fd
 			if expiredKeys != nil {
@@ -229,7 +242,7 @@ func (s *Server) checkTimeOut() {
 			//删除树中已超时的fd
 			//s.checkTimeOutTree.RemoveOneNodeAndChilds(node.Key)
 
-			fmt.Println(s.checkTimeOutTree.InOrder(-1))
+			//fmt.Println(s.checkTimeOutTree.InOrder(-1))
 
 			time.Sleep(time.Second)
 			/**********************************更改删除超时连接的结构为平衡二叉树END**********************************/

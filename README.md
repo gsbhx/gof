@@ -12,6 +12,8 @@ gof是一个开箱即用的websocket框架，通过golang的syscall函数直接�
 
 可配置接收和发送消息的大小。
 
+可自定义是否开启压缩模式。
+
 
 ### gof如何用
 
@@ -45,10 +47,13 @@ type WebSocketInterface interface {
 		ReadBufferSize:    1024, //读取消息的缓冲区大小(byte)
 		WriteBufferSize:   1024, //写入消息的缓冲区大小(byte)
 		ConnectionTimeOut: 5,    //连接超时时间（秒）
+		IsCompressOn: true, //是否开启压缩模式
+		CompressLevel: 9,  //压缩等级
 	}
 	
+func main(){
 	//serve := gof.InitServer("0.0.0.0", 8801,Ws{},nil)
 	serve := gof.InitServer("0.0.0.0", 8801,Ws{},configure)
     serve.Run()
-	
+}
 ```

@@ -46,21 +46,30 @@ func (u *Upgrader) returnError(status int, reason string) (*Conn, error) {
 	return nil, err
 }
 
-func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, error) {
+func (u *Upgrader) Upgrade(fd int, header map[string]string, s *Server) (*Conn, error) {
 	const badHandshake = "websocket: the client is not using the websocket protocol: "
-
-	if header["Connection"]!="Upgrade" && header["Connection"]!="upgrade"{
-		return u.returnError(http.StatusBadRequest, badHandshake+"'upgrade' token not found in 'Connection' header")
+	if Connection, ok := header["Connection"]; ok {
+		cnnt:=false
+		arr := strings.Split(Connection, ",")
+		for _, v := range arr {
+			if strings.Trim(v, " ") == "Upgrade" {
+				cnnt=true
+				break
+			}
+		}
+		if cnnt ==false{
+			return u.returnError(http.StatusBadRequest, badHandshake+"'upgrade' token not found in 'Connection' header")
+		}
 	}
 
-	if header["Upgrade"]!="websocket" {
+	if header["Upgrade"] != "websocket" {
 		return u.returnError(http.StatusBadRequest, badHandshake+"'websocket' token not found in 'Upgrade' header")
 	}
 
 	if header["Method"] != "GET" {
 		return u.returnError(http.StatusMethodNotAllowed, badHandshake+"request method is not GET")
 	}
-	if  header["Sec-WebSocket-Version"] != "13"   {
+	if header["Sec-WebSocket-Version"] != "13" {
 		return u.returnError(http.StatusBadRequest, "websocket: unsupported version: 13 not found in 'Sec-Websocket-Version' header")
 	}
 
@@ -68,26 +77,53 @@ func (u *Upgrader) Upgrade(fd int, header map[string]string,s *Server) (*Conn, e
 	//	return u.returnError(http.StatusInternalServerError, "websocket: application specific 'Sec-WebSocket-Extensions' headers are unsupported")
 	//}
 
-
 	challengeKey := header["Sec-WebSocket-Key"]
 	if challengeKey == "" {
 		return u.returnError(http.StatusBadRequest, "websocket: not a websocket handshake: 'Sec-WebSocket-Key' header is missing or blank")
 	}
-	c := newConn(fd,s)
+	c := newConn(fd, s)
 	// Use larger of hijacked buffer and connection write buffer for header.
-	wf:=[]byte{}
+	wf := s.bytePool.Get().([]byte)
+	defer func() {
+		wf = make([]byte, 0, s.writeBufferSize)
+		s.bytePool.Put(wf)
+	}()
 	wf = append(wf, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "...)
-	wf = append(wf, computeAcceptKey(challengeKey)...)
-	wf = append(wf, "\r\n"...)
 
+	wf = append(wf, computeAcceptKey(challengeKey)...)
+
+
+
+
+
+	wf = append(wf, "\r\n"...)
+	if compress, ok := header["Accept-Encoding"]; ok {
+		arr := strings.Split(compress, ",")
+		for _, v := range arr {
+			if strings.Trim(v, " ") == "deflate" {
+				c.canCompress = true
+				wf = append(wf, "Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover"...)
+				//wf = append(wf, header["Sec-WebSocket-Extensions"]...)
+			}
+		}
+	}
+
+
+
+
+
+
+
+
+	wf = append(wf, "\r\n"...)
 	wf = append(wf, "\r\n"...)
 	c.handShake <- Message{
 		MessageType: -1,
 		Content:     wf,
 	}
+
 	return c, nil
 }
-
 
 func (u *Upgrader) selectSubprotocol(r *http.Request, responseHeader http.Header) string {
 	if u.Subprotocols != nil {

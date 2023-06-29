@@ -73,9 +73,9 @@ func main() {
 	serve := gof.InitServer("0.0.0.0", 8801, Ws{}, &gof.Conf{
 		ReadBufferSize:    1024,
 		WriteBufferSize:   1024,
-		ConnectionTimeOut: 30,
-		IsCompressOn: true,
-		CompressLevel: 9,
+		ConnectionTimeOut: 1000,
+		IsCompressOn:      true,
+		CompressLevel:     9,
 	})
 	go func() {
 		serve.Run()

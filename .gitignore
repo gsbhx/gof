@@ -2,5 +2,3 @@
 /.idea
 /vendor
 /Logs
-/test/client.go
-/test/client_test.go

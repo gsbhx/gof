@@ -111,7 +111,7 @@ func (l *loggerObject) write(levelString string, format string, args ...interfac
 		l.obj.Println(str)
 	}
 	if isConsole {
-		fmt.Printf("%+v\n",str)
+		fmt.Printf("%+v\n", str)
 	}
 
 }
@@ -145,5 +145,6 @@ func (l *loggerObject) isNewDay() bool {
 
 func init() {
 	Log = new(Logger)
+	Log.SetConsole(false)
 	_ = Log.InitLogger("Logs")
 }

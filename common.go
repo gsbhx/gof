@@ -41,6 +41,11 @@ type Message struct {
 	Content     []byte
 }
 
+type WriteMessage struct {
+	fd      int
+	Content []byte
+}
+
 type Conf struct {
 	ReadBufferSize    int
 	WriteBufferSize   int

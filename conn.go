@@ -1,7 +1,6 @@
 package gof
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"syscall"
@@ -40,7 +39,6 @@ func (c *Conn) Read() {
 	}()
 	nbytes, _ := syscall.Read(c.fd, buf)
 	if nbytes > 0 {
-		fmt.Printf("%b\n",buf)
 		Log.Info("Conn Read received message header:%b", buf[:2])
 		//查询状态
 		msgtype := int((buf[0] << 4) >> 4)
@@ -73,9 +71,8 @@ func (c *Conn) Read() {
 			if c.canCompress == true && c.s.isComporessOn == true {
 				// 一个缓存区压缩的内容
 				var err error
-				fmt.Printf("msg.Content===%b\n",msg.Content)
-				msg.Content, err = DeCompress(msg.Content,c)
-				fmt.Println("msg.Content===",msg.Content)
+				fmt.Printf("msg.Content===%b\n", msg.Content)
+				msg.Content, err = DeCompress(msg.Content, c)
 				if err != nil {
 					Log.Fatal("解压句柄为 %d 的消息失败：%+v", c.fd, err.Error())
 					return
@@ -84,7 +81,7 @@ func (c *Conn) Read() {
 			msg.Conn = c
 			c.s.readMessageChan <- msg
 			msg = &Message{
-				Content: make([]byte, 0,c.s.writeBufferSize),
+				Content: make([]byte, 0, c.s.writeBufferSize),
 			}
 			c.s.messagePool.Put(msg)
 		}
@@ -126,9 +123,9 @@ func (c *Conn) getMessage(buf []byte) []byte {
 		}
 	}
 	defer func() {
-		maskSlice = make([]byte,0,c.s.writeBufferSize)
+		maskSlice = make([]byte, 0, c.s.writeBufferSize)
 		c.s.bytePool.Put(maskSlice)
-		content = make([]byte,0,c.s.writeBufferSize)
+		content = make([]byte, 0, c.s.writeBufferSize)
 		c.s.bytePool.Put(content)
 
 	}()
@@ -136,38 +133,16 @@ func (c *Conn) getMessage(buf []byte) []byte {
 }
 
 // @Author WangKan
-// @Description //向句柄中写入文本内容
+// @Description //push content
 // @Date 2021/2/22 14:01
 // @Param
 // @return
 func (c *Conn) Write(message []byte) {
-	fmt.Println("message==",message)
-	msg := c.s.bytePool.Get().([]byte)
-	msg = append(msg, 129)
+	c.s.writeMessageChan <- &Message{
+		Conn:        c,
+		MessageType: TextMessage,
+		Content:     message,
+	}
+	return
 
-	if c.canCompress == true && c.s.isComporessOn == true {
-	var err error
-		msg[0] += 64
-		fmt.Println("msg[0]=",msg[0])
-		message, err = Compress(message, c.s.compressLevel)
-		if err != nil {
-			Log.Fatal("压缩 %d 的消息错误：%+v", c.fd, err)
-		}
-		message= append(message, 0)
-		message=message[:len(message)-5]
-	}
-	length := len(message)
-	if length <= 125 {
-		msg = append(msg, byte(length))
-	} else if length > 125 && length < 65535 {
-		msg = append(msg, 126)
-		tmp := int16(length)
-		bytesBuffer := bytes.NewBuffer([]byte{})
-		_ = binary.Write(bytesBuffer, binary.BigEndian, &tmp)
-		msg = append(msg, bytesBuffer.Bytes()...)
-	}
-	msg = append(msg, message...)
-	_, _ = syscall.Write(c.fd, msg)
-	msg = make([]byte, 0, c.s.writeBufferSize)
-	c.s.bytePool.Put(msg)
 }

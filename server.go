@@ -1,9 +1,12 @@
 package gof
 
 import (
+	"bytes"
 	"compress/flate"
+	"encoding/binary"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -32,6 +35,16 @@ type Server struct {
 	messagePool       *sync.Pool //Message的池子，用于接收消息并返给服务端
 	isComporessOn     bool
 	compressLevel     int
+	writeMessageChan  chan *Message
+}
+
+func (s *Server) Run() {
+	s.checkTimeOut() //如果过期，就关闭conn
+	s.checkMessage() //如果有消息，就调用 conn.read方法解包
+	s.getMessage()   //如果有新的消息，就走消息处理的逻辑
+	s.Push()
+	s.closeConn()
+	s.EpollWait()
 }
 
 func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Server {
@@ -49,6 +62,7 @@ func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Ser
 		connectionTimeout: 30,
 		isComporessOn:     false,
 		compressLevel:     0,
+		writeMessageChan:  make(chan *Message, 1024),
 	}
 	if conf != nil {
 		if conf.ReadBufferSize > 0 {
@@ -63,7 +77,7 @@ func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Ser
 		if conf.IsCompressOn == true {
 			serv.isComporessOn = true
 			serv.compressLevel = conf.CompressLevel
-			if conf.CompressLevel==0{
+			if conf.CompressLevel == 0 {
 				serv.compressLevel = flate.BestCompression
 			}
 		}
@@ -72,20 +86,12 @@ func InitServer(ip string, port int, handle WebSocketInterface, conf *Conf) *Ser
 	serv.readBufPool = &sync.Pool{New: func() interface{} { return make([]byte, serv.readBufferSize) }}
 	serv.messagePool = &sync.Pool{New: func() interface{} {
 		return &Message{
-			Content: make([]byte,0,serv.writeBufferSize),
+			Content: make([]byte, 0, serv.writeBufferSize),
 		}
 	}}
 	serv.bytePool = &sync.Pool{New: func() interface{} { return make([]byte, 0, serv.writeBufferSize) }}
 
 	return serv
-}
-
-func (s *Server) Run() {
-	s.checkTimeOut() //如果过期，就关闭conn
-	s.checkMessage() //如果有消息，就调用 conn.read方法解包
-	s.getMessage()   //如果有新的消息，就走消息处理的逻辑
-	s.closeConn()
-	s.EpollWait()
 }
 
 var upgrader = Upgrader{}
@@ -125,7 +131,6 @@ func (s *Server) handShaker(fd int) {
 		return
 	}
 	heade := <-newConn.handShake
-	fmt.Println(string(heade.Content))
 	n, err := syscall.Write(fd, heade.Content)
 	Log.Info("send handshaker message n:%+v, err: %+v, fd:%d, newConn:%+v\n", n, err, fd, newConn)
 
@@ -144,9 +149,8 @@ func (s *Server) handShaker(fd int) {
 // @Date 2021/2/2 21:37
 func (s *Server) addConn(fd int) (newFd int) {
 	newFd, _, err := syscall.Accept(fd)
-	fmt.Printf("系统描述符新建的链接：%+v\n", newFd)
 	if err != nil {
-		fmt.Println("accept err: ", err)
+		Log.Fatal("accept error,fd is %d", fd)
 		return
 	}
 	//设置fd为非阻塞
@@ -285,4 +289,53 @@ func (s *Server) CloseFds() {
 		s.closeFd(v.(*Conn))
 		return true
 	})
+}
+
+func (s *Server) Push() {
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go s.push()
+	}
+}
+func (s *Server) push() {
+	for {
+		select {
+		case message := <-s.writeMessageChan:
+			msg := s.bytePool.Get().([]byte)
+			msg, err := s.makePushMessage(msg, message)
+			if err != nil {
+				Log.Fatal(err.Error())
+				return
+			}
+			_, _ = syscall.Write(message.Conn.GetFd(), msg)
+			msg = make([]byte, 0, s.writeBufferSize)
+			s.bytePool.Put(msg)
+		}
+	}
+}
+
+func (s *Server) makePushMessage(msg []byte, msge *Message) ([]byte, error) {
+	msg = append(msg, 129)
+	var message []byte
+	if msge.Conn.canCompress == true && s.isComporessOn == true {
+		var err error
+		msg[0] += 64
+		message, err = Compress(msge.Content, s.compressLevel)
+		if err != nil {
+			return nil, fmt.Errorf("Compress %d`s message error ：%+v", msge.Conn.fd, err)
+		}
+		message = append(message, 0)
+		message = message[:len(message)-5]
+	}
+	length := len(message)
+	if length <= 125 {
+		msg = append(msg, byte(length))
+	} else if length > 125 && length < 65535 {
+		msg = append(msg, 126)
+		tmp := int16(length)
+		bytesBuffer := bytes.NewBuffer([]byte{})
+		_ = binary.Write(bytesBuffer, binary.BigEndian, &tmp)
+		msg = append(msg, bytesBuffer.Bytes()...)
+	}
+	msg = append(msg, message...)
+	return msg, nil
 }
